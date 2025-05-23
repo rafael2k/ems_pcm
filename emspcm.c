@@ -485,10 +485,10 @@ static void changeBank(char BANK)
 static void interrupt NewTimerVectBeep(void)
 {
 	static unsigned int	d;
-	if(cpufamily == 2){//286のときだけ
+	if(cpufamily < 3){//286のときだけじゃなくて 16bit機の場合
 		if((playsize >= 0x10000) &&
 			 ((playcount & (0xffff-lowmode)) == (0xffff-lowmode))){//64kB毎
-			changeBank((long)1+(PCMBUFFER + playcount)>>16);
+			changeBank(1+(PCMBUFFER + playcount)>>16);
 		}
 	}
 	if(playcount < playsize){
@@ -549,8 +549,8 @@ static void interrupt NewTimerVectBeep(void)
 	outportb(0x20,0x60);//ioport間違えすぎ!!
 	if(playflag == 0){//途中でCTRL-C押してしまった場合にはタイマー割り込み処理が続けられる その終端処理
 		setvect(0x08,OrgTimerVect);
- if(isPC98){
 		changeBank(0);
+ if(isPC98){
 		/*ｶｳﾝﾀ1(ﾋﾞｰﾌﾟ)の設定*/
 		outportb(0x35,(inportb(0x35)|0x08));	/* beep off */
 		outportb(0x77,0x76);					/* set timer #1 to mode 3 */
@@ -582,10 +582,10 @@ static void interrupt NewTimerVectBeep16(void)
 {
 	static unsigned int d;
 
-	if(cpufamily == 2){//286のときだけ
+	if(cpufamily < 3){//286のときだけじゃなくて 16bit機の場合
 		if( (playsize >= 0x10000) &&
 		 ( ((playcount & (0xffff-lowmode)) == (0xffff-lowmode)) || ((playcount & (0xfffe-lowmode)) == (0xfffe-lowmode)) ) ){//64kB毎
-			changeBank((long)1+(PCMBUFFER + playcount)>>16);
+			changeBank(1+(PCMBUFFER + playcount)>>16);
 		}
 	}
 
@@ -644,9 +644,9 @@ static void interrupt NewTimerVectBeep16(void)
 	outportb(0x20,0x60);
 
 	if(playflag == 0){//途中でCTRL-C押してしまった場合に
+		changeBank(0);
 		setvect(0x08,OrgTimerVect);
  if(isPC98){
-		changeBank(0);
 		/*ｶｳﾝﾀ1(ﾋﾞｰﾌﾟ)の設定*/
 		outportb(0x35,(inportb(0x35)|0x08));	/* beep off */
 		outportb(0x77,0x76);					/* set timer #1 to mode 3 */
@@ -745,10 +745,8 @@ long LoadBF(char *wavename)
 	int read;
 	long Highaddress,Lowaddress;
 	long fsize2;
-	char emscard2 = 0xff;
-	char EMJcard2 = 0;
-
-	cpucheck();
+	unsigned char emscard2 = 0xff;
+	unsigned char EMJcard2 = 0;
 
 	if((fp = fopen(wavename, "rb")) == NULL) {
 		fprintf(stderr, "Error! file open failed.\n");
@@ -906,25 +904,27 @@ emscheck_end:
  }	
 	emscard = emscard2;		//うちのopenwatcomがこの数値をちゃんとやってくれないので面倒なことを一個はさんでいる
 	printf("EMScard detect %x %x\n",emscard2,EMJcard2);
-	if(emscard > 0xfd)goto loadend;
+	if(emscard2 > 0xfd)goto loadend;
 	if(emscard == 2){					//EMJがプロテクトメモリにもなってるはず?
 		EMJcard = EMJcard2 & 0xf;
 		if(PCMBUFFER > (long)EMJcard << 20)
 			PCMBUFFER -= (long)EMJcard << 20;	//メモリ位置
 		else PCMBUFFER = 0x10000;		//0をいれるとやっかいなのでここからにする
-		printf("EMJcard detect %x address %lx\n",EMJcard,(long)0+((PCMBUFFER+ fsize -65536) >> 16));
+		printf("EMJcard detect %x address %lx\n",EMJcard,0+((PCMBUFFER+ fsize -65536) >> 16));
 	}
 	if(emscard == 3){
 		EMJcard = EMJcard2;				//EMSとしての先頭をとりあえず保管
 		if(EMJcard == 0)EMJcard  = 1;	//とりあえず00での先頭はやっかいなのでよける
+		if(EMJcard < 4)			//EMSが1Mより下のアドレスを指してるならEMS専用モードかも
+			PCMBUFFER = (long)EMJcard << 18;
 		if(PCMBUFFER < (long)EMJcard << 18)	//EMS先頭よりもPCM先頭が下ならば上に引き上げる(2枚刺しとかの話…)
 			PCMBUFFER = (long)EMJcard << 18;
-		printf("PC34 detect %x address %lx\n",EMJcard,(long)0+((PCMBUFFER+ fsize -65536) >> 16));
+		printf("PC34 detect %x address %lx\n",EMJcard,0+((PCMBUFFER+ fsize -65536) >> 16));
 	}
 	if(isPC98)Highaddress = 0xc0000;
 	else	Highaddress = 0xd0000;
 loadems:
-	changeBank((long)0+((PCMBUFFER+ fsize -65536) >> 16));
+	changeBank(0+((PCMBUFFER+ fsize -65536) >> 16));
 	copymem(Lowaddress, Highaddress, 0);
 	fsize2 = 0;
 	while((read=fgetc(fp))!=EOF){
@@ -932,7 +932,7 @@ loadems:
 		fsize++;
 		if(fsize2 == 65536)goto loadems;
 	}
-	changeBank((long)0+((PCMBUFFER+ fsize) >> 16));
+	changeBank(0+((PCMBUFFER+ fsize) >> 16));
 //	copymem(Lowaddress, Highaddress, fsize2);
 	copymem(Lowaddress, Highaddress, 0);//全部のメモリに書き込みをやっておかないとパリティエラー吐かれる
 	changeBank(PCMBUFFER >> 16);
@@ -1160,6 +1160,8 @@ int main(int argc, char *argv[])
 		printf("This Machine is not NEC98\n");
 	}
 
+	cpucheck();
+
 	if(argc>1){
 		strcpy(wavename,argv[1]);
 		if ((wavename[0] == '-')&&(wavename[1] == 'l')){
@@ -1187,15 +1189,23 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if(cpufamily < 3)lowmode = 2;	//16bit機では必ず下げることにした
+
 	freq = BeepBuf[25];
 	freq = freq << 8;
 	freq |= BeepBuf[24];
 	printf("WAV sample %uHz ",freq);
 	if (freq < 8001)lowmode = 0;
 	if(lowmode){
+	 if(cpufamily > 2)
 		for(lowmode = 1;freq > 4000;lowmode<<=1){ //8kまでは下げることにしたがまだきつい ので4000まで下げる
 			freq >>= 1;//周波数を半減していく
 		}
+	 }else{
+		for(lowmode = 1;freq > 2000;lowmode<<=1){ //286未満では2kまで下げることにした
+			freq >>= 1;//周波数を半減していく
+		}
+	 }
 	printf("play with %uHz ",freq);
 	}
 	if(BeepBuf[34] == 8){//unsigned 8bit PCM
