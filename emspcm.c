@@ -182,6 +182,7 @@ static void setvect(unsigned int intnumber, long isr){
 static void changeBank(char BANK)
 {
 	unsigned char	BANK0,BANK1;
+	int	BANK2;
 	switch(emscard){
 	case 1:
 	if(isPC98){				//PC-9801-53 or NekoProject2
@@ -398,7 +399,7 @@ static void changeBank(char BANK)
 	}
 		break;
 	case 3://PIO-PC34		これだけやけに遅い 理由不明
-			BANK0 = BANK << 2;
+			BANK2 = ((int)BANK) << 2;
 	if(BANK == 0){
 		_asm {
 			mov	dx,0e8h
@@ -416,14 +417,14 @@ static void changeBank(char BANK)
 			out	dx,al
 
 			mov	dx,0e8h
-			mov	al,0c1h	//窓2
+			mov	al,0c2h	//窓2
 			out	dx,al
 			inc	dx
 			mov	al,0h		//出さない
 			out	dx,al
 
 			mov	dx,0e8h
-			mov	al,0c1h	//窓3
+			mov	al,0c3h	//窓3
 			out	dx,al
 			inc	dx
 			mov	al,0h		//出さない
@@ -439,7 +440,7 @@ static void changeBank(char BANK)
 			mov	al,0c3h	//出す場所C0000-C3FFF
 			out	dx,al
 			inc	dx
-			mov	al,BANK0	//出すメモリ番号 0-255では4MiBまでしか無理
+			mov	ax,BANK2	//出すメモリ番号 0-255では4MiBまでしか無理
 			out	dx,ax		//もっと上まで使えるけど面倒なので今はこれで
 
 			mov	dx,0e8h
@@ -449,7 +450,7 @@ static void changeBank(char BANK)
 			mov	al,0c7h	//出す場所C4000-C7FFF
 			out	dx,al
 			inc	dx
-			mov	al,BANK0	//出すメモリ番号
+			mov	ax,BANK2	//出すメモリ番号
 			add	ax,1
 			out	dx,ax
 
@@ -460,18 +461,18 @@ static void changeBank(char BANK)
 			mov	al,0cbh	//出す場所C8000-CBFFF
 			out	dx,al
 			inc	dx
-			mov	al,BANK0	//出すメモリ番号
+			mov	ax,BANK2	//出すメモリ番号
 			add	ax,2
 			out	dx,ax
 
 			mov	dx,0e8h
-			mov	al,0c2h	//窓3
+			mov	al,0c3h	//窓3
 			out	dx,al
 			inc	dx
-			mov	al,0cbh	//出す場所CC000-CFFFF
+			mov	al,0cfh	//出す場所CC000-CFFFF
 			out	dx,al
 			inc	dx
-			mov	al,BANK0	//出すメモリ番号
+			mov	ax,BANK2	//出すメモリ番号
 			add	ax,3
 			out	dx,ax
 		}
