@@ -398,7 +398,7 @@ static void changeBank(char BANK)
 		}
 	}
 		break;
-	case 3://PIO-PC34		これだけやけに遅い 理由不明
+	case 3://PIO-PC34
 			BANK2 = ((int)BANK) << 2;
 	if(BANK == 0){
 		_asm {
